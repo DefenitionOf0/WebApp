@@ -116,7 +116,7 @@ if uploaded_file is not None:
         st.image(binary, caption="Бинаризованное изображение", use_container_width=True)
 
         if contours:
-            result_image = np.zeros_like(image, order="C", dtype=np.uint8, shape=(1, 3))
+            result_image = np.zeros_like(image, order="C", dtype=np.uint8, shape=(3, 1))
             for contour in contours:
                 contour = contour.astype(np.int32)
                 cv2.polylines(result_image, [contour], isClosed=True, color=(255, 0, 255), thickness=1)
