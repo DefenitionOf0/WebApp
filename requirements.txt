@@ -1,2 +1,1 @@
-opency-python-headless
 opencv-python
