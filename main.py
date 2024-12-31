@@ -105,7 +105,7 @@ if uploaded_file is not None:
     if st.button("Применить фильтры"):
         filtered_image = apply_filters(image, blur, contrast, median_filter)
         st.image(filtered_image, caption="Изображение после фильтрации", use_container_width=True)
-    np.reshape(np.zeros_like(image), (image.shape[0], image.shape[1], 3))
+    image = np.reshape(image, (image.shape[0], image.shape[1], 3))
     # Обработка изображения
     if st.button("Обработать изображение"):
         filtered_image = apply_filters(image, blur, contrast, median_filter)
