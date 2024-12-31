@@ -116,7 +116,7 @@ if uploaded_file is not None:
         st.image(binary, caption="Бинаризованное изображение", use_container_width=True)
         
         if contours:
-            result_image = np.zeros(image.shape[0], image.shape[1], 3)
+            result_image = np.zeros((image.shape[0], image.shape[1], 3), dtype=np.uint8)
             
             for contour in contours:
                 contour = contour.astype(np.int32)
