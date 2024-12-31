@@ -116,7 +116,7 @@ if uploaded_file is not None:
         st.image(binary, caption="Бинаризованное изображение", use_container_width=True)
 
         if contours:
-            result_image = np.zeros_like(image)  #np.reshape(np.zeros_like(image), 3) #np.zeros_like(image, order="C", dtype=np.uint8, shape=(1,1))
+            result_image = np.reshape(np.zeros_like(image), (image.shape[0], image.shape[1], 3)) #np.zeros_like(image, order="C", dtype=np.uint8, shape=(1,1))
             st.warning(result_image.shape[2])
             for contour in contours:
                 contour = contour.astype(np.int32)
