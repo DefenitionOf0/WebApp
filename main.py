@@ -105,7 +105,7 @@ if uploaded_file is not None:
     if st.button("Применить фильтры"):
         filtered_image = apply_filters(image, blur, contrast, median_filter)
         st.image(filtered_image, caption="Изображение после фильтрации", use_container_width=True)
-
+    np.reshape(np.zeros_like(image), (image.shape[0], image.shape[1], 3))
     # Обработка изображения
     if st.button("Обработать изображение"):
         filtered_image = apply_filters(image, blur, contrast, median_filter)
@@ -116,7 +116,7 @@ if uploaded_file is not None:
         st.image(binary, caption="Бинаризованное изображение", use_container_width=True)
         st.warning(image.shape[2])
         if contours:
-            result_image = np.reshape(np.zeros_like(image), (image.shape[0], image.shape[1], 3)) #np.zeros_like(image, order="C", dtype=np.uint8, shape=(1,1))
+            result_image = np.zeros_like(image)
             
             for contour in contours:
                 contour = contour.astype(np.int32)
