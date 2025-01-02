@@ -97,7 +97,11 @@ if uploaded_file:
         perimeter_thresh = st.slider("Минимальная длина периметра", 1, 500, 10)
 
     # Применение фильтров
-    filtered_image = processor.apply_filters(blur, contrast, median_filter)
+    if len(filtered_image.shape) == 2:  # Если чёрно-белое
+        filtered_image = cv2.cvtColor(filtered_image, cv2.COLOR_GRAY2RGB)
+    else:  # Если BGR
+        filtered_image = cv2.cvtColor(filtered_image, cv2.COLOR_BGR2RGB)
+
     st.image(filtered_image, caption="Изображение после фильтрации", use_container_width=True, key="filtered")
 
     # Обработка изображения
