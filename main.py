@@ -4,7 +4,6 @@ import numpy as np
 from PIL import Image
 from io import BytesIO
 import plotly.graph_objects as go
-from streamlit_keyboard_events import keyboard_event
 
 
 class ImageProcessor:
@@ -68,12 +67,6 @@ def resize_image(image, max_size=1024):
     return image
 
 
-# Функция для масштабирования изображения
-def zoom_image(image, zoom_factor):
-    h, w = image.shape[:2]
-    return cv2.resize(image, (w * zoom_factor, h * zoom_factor), interpolation=cv2.INTER_LINEAR)
-
-
 # Функция для отображения изображения с Plotly
 def plot_image_with_contours(image, contours, highlight_index=None):
     fig = go.Figure()
@@ -103,6 +96,9 @@ if uploaded_file:
     image = resize_image(image)
     processor = ImageProcessor(image)
 
+    if "current_contour" not in st.session_state:
+        st.session_state.current_contour = 0
+
     if "history" not in st.session_state:
         st.session_state.history = []
 
@@ -118,7 +114,6 @@ if uploaded_file:
         adaptive_thresh = st.checkbox("Адаптивная бинаризация", key="adaptive_thresh")
         area_thresh = st.slider("Минимальная площадь", 1, 1000, 10, key="area_thresh")
         perimeter_thresh = st.slider("Минимальная длина периметра", 1, 500, 10, key="perimeter_thresh")
-        zoom_factor = st.slider("Масштаб", 1, 5, 1, key="zoom_factor")
 
     filtered_image = processor.apply_filters(
         blur=st.session_state.blur,
@@ -139,11 +134,21 @@ if uploaded_file:
         perimeter_thresh=st.session_state.perimeter_thresh
     )
 
-    selected_contour = st.selectbox("Выберите контур для подсветки:", options=list(range(len(processor.contours))), index=0)
-    result_image = processor.draw_contours(highlight_index=int(selected_contour))
-    zoomed_image = zoom_image(result_image, st.session_state.zoom_factor)
-    st.image(zoomed_image, caption=f"Обработанное изображение (Масштаб {st.session_state.zoom_factor}x)", use_container_width=True)
+    # Навигация по контурам
+    prev_contour = st.button("⬅ Предыдущий контур")
+    next_contour = st.button("Следующий контур ➡")
 
+    if prev_contour:
+        st.session_state.current_contour = max(0, st.session_state.current_contour - 1)
+
+    if next_contour:
+        st.session_state.current_contour = min(len(processor.contours) - 1, st.session_state.current_contour + 1)
+
+    selected_contour = st.session_state.current_contour
+    result_image = processor.draw_contours(highlight_index=selected_contour)
+    st.image(result_image, caption=f"Текущий контур: {selected_contour}", use_container_width=True)
+
+    # Сохранение состояния
     if st.button("Сохранить текущее состояние"):
         st.session_state.history.append(result_image.copy())
         st.success("Состояние сохранено!")
@@ -162,10 +167,3 @@ if uploaded_file:
             file_name="processed_image.jpg",
             mime="image/jpeg"
         )
-
-    key_event = keyboard_event(key="last_key_pressed")
-    if key_event == "ArrowRight":
-        selected_contour = (selected_contour + 1) % len(processor.contours)
-    elif key_event == "ArrowLeft":
-        selected_contour = (selected_contour - 1) % len(processor.contours)
-    st.write(f"Текущий контур: {selected_contour}")
