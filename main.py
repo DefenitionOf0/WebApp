@@ -3,6 +3,8 @@ import cv2
 import numpy as np
 from PIL import Image
 from io import BytesIO
+import plotly.graph_objects as go
+from streamlit_keyboard_events import keyboard_event
 
 
 class ImageProcessor:
@@ -15,52 +17,32 @@ class ImageProcessor:
         self.contours = None
 
     def apply_filters(self, blur, contrast, median_filter):
-        # Копируем изображение, чтобы избежать изменений исходного
         img = self.image.copy()
-
-        # Применяем размытие
         if blur > 0:
             img = cv2.GaussianBlur(img, (blur * 2 + 1, blur * 2 + 1), 0)
-
-        # Применяем контраст
         if contrast > 1.0:
             img = cv2.convertScaleAbs(img, alpha=contrast, beta=0)
-
-        # Применяем медианный фильтр
         if median_filter > 0:
             img = cv2.medianBlur(img, median_filter * 2 + 1)
-
         self.filtered_image = img
         return img
 
     def process_image(self, scaling_factor, tolerance, binary_thresh, adaptive_thresh):
-        if len(self.image.shape) == 3:  # Если изображение цветное
-            gray = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
-        else:
-            gray = self.image
-
+        gray = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY) if len(self.image.shape) == 3 else self.image
         inverted_image = cv2.bitwise_not(gray)
-
-        # Бинаризация
         if adaptive_thresh:
             binary = cv2.adaptiveThreshold(
                 inverted_image, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2
             )
         else:
             _, binary = cv2.threshold(inverted_image, binary_thresh, 255, cv2.THRESH_BINARY)
-
         self.binary_image = binary
-
-        # Поиск контуров
         contours, _ = cv2.findContours(binary, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
-
-        # Упрощение контуров
-        simplified_contours = [
+        self.contours = [
             (cv2.approxPolyDP(contour, epsilon=tolerance, closed=True) * scaling_factor).astype(np.int32)
             for contour in contours if len(contour) >= 3
         ]
-        self.contours = simplified_contours
-        return simplified_contours
+        return self.contours
 
     def clean_contours(self, area_thresh, perimeter_thresh):
         self.contours = [
@@ -86,69 +68,104 @@ def resize_image(image, max_size=1024):
     return image
 
 
+# Функция для масштабирования изображения
+def zoom_image(image, zoom_factor):
+    h, w = image.shape[:2]
+    return cv2.resize(image, (w * zoom_factor, h * zoom_factor), interpolation=cv2.INTER_LINEAR)
+
+
+# Функция для отображения изображения с Plotly
+def plot_image_with_contours(image, contours, highlight_index=None):
+    fig = go.Figure()
+    fig.add_trace(go.Image(z=image))
+    for idx, contour in enumerate(contours):
+        color = "green" if idx == highlight_index else "magenta"
+        x, y = contour[:, 0, 0], contour[:, 0, 1]
+        fig.add_trace(go.Scatter(x=x, y=y, mode="lines", line=dict(color=color, width=2), name=f"Contour {idx}"))
+    fig.update_layout(
+        xaxis=dict(visible=False),
+        yaxis=dict(visible=False),
+        dragmode="pan",
+        showlegend=False,
+    )
+    return fig
+
+
 # Настройка страницы Streamlit
-st.set_page_config(page_title="Обработка изображений", layout="wide")
+st.set_page_config(page_title="Интерактивная обработка изображений", layout="wide")
 st.title("Интерактивная обработка изображений")
 
-# Загрузка изображения
 uploaded_file = st.file_uploader("Загрузите изображение", type=["jpg", "png", "jpeg"])
 
 if uploaded_file:
-    # Открытие изображения
-    try:
-        op_image = Image.open(uploaded_file)
-        image = np.array(op_image)
-        image = resize_image(image)
-        processor = ImageProcessor(image)
+    op_image = Image.open(uploaded_file)
+    image = np.array(op_image)
+    image = resize_image(image)
+    processor = ImageProcessor(image)
 
-        # Отображение исходного изображения
-        st.image(image, caption="Исходное изображение", use_container_width=True)
+    if "history" not in st.session_state:
+        st.session_state.history = []
 
-        # Настройки в боковой панели
-        with st.sidebar:
-            st.header("Настройки")
-            blur = st.slider("Размытие", 0, 10, 0)
-            contrast = st.slider("Контрастность", 1.0, 3.0, 1.0)
-            median_filter = st.slider("Медианный фильтр", 0, 10, 0)
-            scaling_factor = st.slider("Масштаб контуров", 0.1, 1.0, 1.0)
-            tolerance = st.slider("Упрощение контуров", 0.1, 10.0, 1.0)
-            binary_thresh = st.slider("Порог бинаризации", 0, 255, 127)
-            adaptive_thresh = st.checkbox("Адаптивная бинаризация")
-            area_thresh = st.slider("Минимальная площадь", 1, 1000, 10)
-            perimeter_thresh = st.slider("Минимальная длина периметра", 1, 500, 10)
-            highlight_index = st.number_input("Номер контура для подсветки", min_value=0, value=0, step=1)
+    # Настройки в боковой панели
+    with st.sidebar:
+        st.header("Настройки")
+        blur = st.slider("Размытие", 0, 10, 0, key="blur")
+        contrast = st.slider("Контрастность", 1.0, 3.0, 1.0, key="contrast")
+        median_filter = st.slider("Медианный фильтр", 0, 10, 0, key="median_filter")
+        scaling_factor = st.slider("Масштаб контуров", 0.1, 1.0, 1.0, key="scaling_factor")
+        tolerance = st.slider("Упрощение контуров", 0.1, 10.0, 1.0, key="tolerance")
+        binary_thresh = st.slider("Порог бинаризации", 0, 255, 127, key="binary_thresh")
+        adaptive_thresh = st.checkbox("Адаптивная бинаризация", key="adaptive_thresh")
+        area_thresh = st.slider("Минимальная площадь", 1, 1000, 10, key="area_thresh")
+        perimeter_thresh = st.slider("Минимальная длина периметра", 1, 500, 10, key="perimeter_thresh")
+        zoom_factor = st.slider("Масштаб", 1, 5, 1, key="zoom_factor")
 
-        # Применение фильтров
-        filtered_image = processor.apply_filters(blur, contrast, median_filter)
-        
-        if isinstance(filtered_image, np.ndarray):
-            if len(filtered_image.shape) == 2:  # Чёрно-белое
-                filtered_image = cv2.cvtColor(filtered_image, cv2.COLOR_GRAY2RGB)
-            else:  # Цветное (BGR -> RGB)
-                filtered_image = cv2.cvtColor(filtered_image, cv2.COLOR_BGR2RGB)
-        
-            st.image(filtered_image, caption="Изображение после фильтрации", use_container_width=True)
-        
-        # Обработка изображения
-        processor.process_image(scaling_factor, tolerance, binary_thresh, adaptive_thresh)
-        processor.clean_contours(area_thresh, perimeter_thresh)
-        
-        # Отрисовка контуров
-        result_image = processor.draw_contours(highlight_index=int(highlight_index))
-        st.image(result_image, caption="Обработанные контуры", use_container_width=True)
+    filtered_image = processor.apply_filters(
+        blur=st.session_state.blur,
+        contrast=st.session_state.contrast,
+        median_filter=st.session_state.median_filter
+    )
+    filtered_image = cv2.cvtColor(filtered_image, cv2.COLOR_BGR2RGB)
+    st.image(filtered_image, caption="Изображение после фильтрации", use_container_width=True)
 
+    processor.process_image(
+        scaling_factor=st.session_state.scaling_factor,
+        tolerance=st.session_state.tolerance,
+        binary_thresh=st.session_state.binary_thresh,
+        adaptive_thresh=st.session_state.adaptive_thresh
+    )
+    processor.clean_contours(
+        area_thresh=st.session_state.area_thresh,
+        perimeter_thresh=st.session_state.perimeter_thresh
+    )
 
-        # Сохранение результата
-        buffer = BytesIO()
-        is_success, encoded_image = cv2.imencode('.jpg', result_image)
-        if is_success:
-            buffer.write(encoded_image.tobytes())
-            st.download_button(
-                "Скачать обработанное изображение",
-                data=buffer,
-                file_name="processed_image.jpg",
-                mime="image/jpeg"
-            )
+    selected_contour = st.selectbox("Выберите контур для подсветки:", options=list(range(len(processor.contours))), index=0)
+    result_image = processor.draw_contours(highlight_index=int(selected_contour))
+    zoomed_image = zoom_image(result_image, st.session_state.zoom_factor)
+    st.image(zoomed_image, caption=f"Обработанное изображение (Масштаб {st.session_state.zoom_factor}x)", use_container_width=True)
 
-    except Exception as e:
-        st.error(f"Произошла ошибка при обработке изображения: {e}")
+    if st.button("Сохранить текущее состояние"):
+        st.session_state.history.append(result_image.copy())
+        st.success("Состояние сохранено!")
+
+    if st.session_state.history:
+        history_index = st.selectbox("Выберите состояние из истории:", options=list(range(len(st.session_state.history))))
+        st.image(st.session_state.history[history_index], caption=f"Состояние {history_index}", use_container_width=True)
+
+    buffer = BytesIO()
+    is_success, encoded_image = cv2.imencode('.jpg', result_image)
+    if is_success:
+        buffer.write(encoded_image.tobytes())
+        st.download_button(
+            "Скачать обработанное изображение",
+            data=buffer,
+            file_name="processed_image.jpg",
+            mime="image/jpeg"
+        )
+
+    key_event = keyboard_event(key="last_key_pressed")
+    if key_event == "ArrowRight":
+        selected_contour = (selected_contour + 1) % len(processor.contours)
+    elif key_event == "ArrowLeft":
+        selected_contour = (selected_contour - 1) % len(processor.contours)
+    st.write(f"Текущий контур: {selected_contour}")
