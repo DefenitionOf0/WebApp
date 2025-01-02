@@ -7,34 +7,54 @@ from io import BytesIO
 
 class ImageProcessor:
     def __init__(self, image):
+        if not isinstance(image, np.ndarray):
+            raise ValueError("Ошибка: входное изображение должно быть массивом NumPy.")
         self.image = image
         self.filtered_image = None
         self.binary_image = None
         self.contours = None
 
     def apply_filters(self, blur, contrast, median_filter):
+        # Копируем изображение, чтобы избежать изменений исходного
         img = self.image.copy()
+
+        # Применяем размытие
         if blur > 0:
             img = cv2.GaussianBlur(img, (blur * 2 + 1, blur * 2 + 1), 0)
+
+        # Применяем контраст
         if contrast > 1.0:
             img = cv2.convertScaleAbs(img, alpha=contrast, beta=0)
+
+        # Применяем медианный фильтр
         if median_filter > 0:
             img = cv2.medianBlur(img, median_filter * 2 + 1)
+
         self.filtered_image = img
         return img
 
     def process_image(self, scaling_factor, tolerance, binary_thresh, adaptive_thresh):
-        gray = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY) if len(self.image.shape) == 3 else self.image
+        if len(self.image.shape) == 3:  # Если изображение цветное
+            gray = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
+        else:
+            gray = self.image
+
         inverted_image = cv2.bitwise_not(gray)
+
+        # Бинаризация
         if adaptive_thresh:
             binary = cv2.adaptiveThreshold(
                 inverted_image, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2
             )
         else:
             _, binary = cv2.threshold(inverted_image, binary_thresh, 255, cv2.THRESH_BINARY)
+
         self.binary_image = binary
 
+        # Поиск контуров
         contours, _ = cv2.findContours(binary, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+
+        # Упрощение контуров
         simplified_contours = [
             (cv2.approxPolyDP(contour, epsilon=tolerance, closed=True) * scaling_factor).astype(np.int32)
             for contour in contours if len(contour) >= 3
@@ -57,7 +77,7 @@ class ImageProcessor:
         return result_image
 
 
-# Утилита для изменения размера изображений
+# Функция для изменения размера изображений
 def resize_image(image, max_size=1024):
     h, w = image.shape[:2]
     if max(h, w) > max_size:
@@ -75,64 +95,59 @@ uploaded_file = st.file_uploader("Загрузите изображение", ty
 
 if uploaded_file:
     # Открытие изображения
-    op_image = Image.open(uploaded_file)
-    image = np.array(op_image)
-    image = resize_image(image)
-    processor = ImageProcessor(image)
+    try:
+        op_image = Image.open(uploaded_file)
+        image = np.array(op_image)
+        image = resize_image(image)
+        processor = ImageProcessor(image)
 
-    # Отображение исходного изображения
-    st.image(image, caption="Исходное изображение", use_container_width=True)
+        # Отображение исходного изображения
+        st.image(image, caption="Исходное изображение", use_container_width=True)
 
-    # Настройки в боковой панели
-    with st.sidebar:
-        st.header("Настройки")
-        blur = st.slider("Размытие", 0, 10, 0)
-        contrast = st.slider("Контрастность", 1.0, 3.0, 1.0)
-        median_filter = st.slider("Медианный фильтр", 0, 10, 0)
-        scaling_factor = st.slider("Масштаб контуров", 0.1, 1.0, 1.0)
-        tolerance = st.slider("Упрощение контуров", 0.1, 10.0, 1.0)
-        binary_thresh = st.slider("Порог бинаризации", 0, 255, 127)
-        adaptive_thresh = st.checkbox("Адаптивная бинаризация")
-        area_thresh = st.slider("Минимальная площадь", 1, 1000, 10)
-        perimeter_thresh = st.slider("Минимальная длина периметра", 1, 500, 10)
+        # Настройки в боковой панели
+        with st.sidebar:
+            st.header("Настройки")
+            blur = st.slider("Размытие", 0, 10, 0)
+            contrast = st.slider("Контрастность", 1.0, 3.0, 1.0)
+            median_filter = st.slider("Медианный фильтр", 0, 10, 0)
+            scaling_factor = st.slider("Масштаб контуров", 0.1, 1.0, 1.0)
+            tolerance = st.slider("Упрощение контуров", 0.1, 10.0, 1.0)
+            binary_thresh = st.slider("Порог бинаризации", 0, 255, 127)
+            adaptive_thresh = st.checkbox("Адаптивная бинаризация")
+            area_thresh = st.slider("Минимальная площадь", 1, 1000, 10)
+            perimeter_thresh = st.slider("Минимальная длина периметра", 1, 500, 10)
+            highlight_index = st.number_input("Номер контура для подсветки", min_value=0, value=0, step=1)
 
-    # Применение фильтров
-filtered_image = processor.apply_filters(blur, contrast, median_filter)
+        # Применение фильтров
+        filtered_image = processor.apply_filters(blur, contrast, median_filter)
 
-if filtered_image is None:
-    st.error("Ошибка: изображение не обработано.")
-else:
-    if isinstance(filtered_image, np.ndarray):  # Проверка типа
-        if len(filtered_image.shape) == 2:  # Если чёрно-белое
-            filtered_image = cv2.cvtColor(filtered_image, cv2.COLOR_GRAY2RGB)
-        else:  # Если BGR
-            filtered_image = cv2.cvtColor(filtered_image, cv2.COLOR_BGR2RGB)
-        st.image(filtered_image, caption="Изображение после фильтрации", use_container_width=True, key="filtered")
-    else:
-        st.error("Ошибка: возвращённое изображение имеет некорректный формат.")
-    st.write(f"Тип данных: {type(filtered_image)}")
-    st.write(f"Размеры: {filtered_image.shape if isinstance(filtered_image, np.ndarray) else 'Нет данных'}") 
-    
-    # Обработка изображения
-    processor.process_image(scaling_factor, tolerance, binary_thresh, adaptive_thresh)
-    processor.clean_contours(area_thresh, perimeter_thresh)
+        if isinstance(filtered_image, np.ndarray):
+            if len(filtered_image.shape) == 2:  # Чёрно-белое
+                filtered_image = cv2.cvtColor(filtered_image, cv2.COLOR_GRAY2RGB)
+            else:  # Цветное (BGR -> RGB)
+                filtered_image = cv2.cvtColor(filtered_image, cv2.COLOR_BGR2RGB)
 
-    # Интерактивный выбор контура
-    contour_indices = list(range(len(processor.contours)))
-    selected_contour = st.selectbox("Выберите контур для подсветки:", options=contour_indices, index=0)
+            st.image(filtered_image, caption="Изображение после фильтрации", use_container_width=True, key="filtered")
 
-    # Подсветка выбранного контура
-    result_image = processor.draw_contours(highlight_index=selected_contour)
-    st.image(result_image, caption="Обработанные контуры", use_container_width=True, key="result")
+        # Обработка изображения
+        processor.process_image(scaling_factor, tolerance, binary_thresh, adaptive_thresh)
+        processor.clean_contours(area_thresh, perimeter_thresh)
 
-    # Сохранение результата
-    buffer = BytesIO()
-    is_success, encoded_image = cv2.imencode('.jpg', result_image)
-    if is_success:
-        buffer.write(encoded_image.tobytes())
-        st.download_button(
-            "Скачать обработанное изображение",
-            data=buffer,
-            file_name="processed_image.jpg",
-            mime="image/jpeg"
-        )
+        # Отрисовка контуров
+        result_image = processor.draw_contours(highlight_index=int(highlight_index))
+        st.image(result_image, caption="Обработанные контуры", use_container_width=True, key="result")
+
+        # Сохранение результата
+        buffer = BytesIO()
+        is_success, encoded_image = cv2.imencode('.jpg', result_image)
+        if is_success:
+            buffer.write(encoded_image.tobytes())
+            st.download_button(
+                "Скачать обработанное изображение",
+                data=buffer,
+                file_name="processed_image.jpg",
+                mime="image/jpeg"
+            )
+
+    except Exception as e:
+        st.error(f"Произошла ошибка при обработке изображения: {e}")
