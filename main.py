@@ -120,22 +120,23 @@ if uploaded_file:
 
         # Применение фильтров
         filtered_image = processor.apply_filters(blur, contrast, median_filter)
-
+        
         if isinstance(filtered_image, np.ndarray):
             if len(filtered_image.shape) == 2:  # Чёрно-белое
                 filtered_image = cv2.cvtColor(filtered_image, cv2.COLOR_GRAY2RGB)
             else:  # Цветное (BGR -> RGB)
                 filtered_image = cv2.cvtColor(filtered_image, cv2.COLOR_BGR2RGB)
-
-            st.image(filtered_image, caption="Изображение после фильтрации", use_container_width=True, key="filtered")
-
+        
+            st.image(filtered_image, caption="Изображение после фильтрации", use_container_width=True)
+        
         # Обработка изображения
         processor.process_image(scaling_factor, tolerance, binary_thresh, adaptive_thresh)
         processor.clean_contours(area_thresh, perimeter_thresh)
-
+        
         # Отрисовка контуров
         result_image = processor.draw_contours(highlight_index=int(highlight_index))
-        st.image(result_image, caption="Обработанные контуры", use_container_width=True, key="result")
+        st.image(result_image, caption="Обработанные контуры", use_container_width=True)
+
 
         # Сохранение результата
         buffer = BytesIO()
