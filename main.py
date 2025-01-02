@@ -97,13 +97,22 @@ if uploaded_file:
         perimeter_thresh = st.slider("Минимальная длина периметра", 1, 500, 10)
 
     # Применение фильтров
-    if len(filtered_image.shape) == 2:  # Если чёрно-белое
-        filtered_image = cv2.cvtColor(filtered_image, cv2.COLOR_GRAY2RGB)
-    else:  # Если BGR
-        filtered_image = cv2.cvtColor(filtered_image, cv2.COLOR_BGR2RGB)
+filtered_image = processor.apply_filters(blur, contrast, median_filter)
 
-    st.image(filtered_image, caption="Изображение после фильтрации", use_container_width=True, key="filtered")
-
+if filtered_image is None:
+    st.error("Ошибка: изображение не обработано.")
+else:
+    if isinstance(filtered_image, np.ndarray):  # Проверка типа
+        if len(filtered_image.shape) == 2:  # Если чёрно-белое
+            filtered_image = cv2.cvtColor(filtered_image, cv2.COLOR_GRAY2RGB)
+        else:  # Если BGR
+            filtered_image = cv2.cvtColor(filtered_image, cv2.COLOR_BGR2RGB)
+        st.image(filtered_image, caption="Изображение после фильтрации", use_container_width=True, key="filtered")
+    else:
+        st.error("Ошибка: возвращённое изображение имеет некорректный формат.")
+    st.write(f"Тип данных: {type(filtered_image)}")
+    st.write(f"Размеры: {filtered_image.shape if isinstance(filtered_image, np.ndarray) else 'Нет данных'}") 
+    
     # Обработка изображения
     processor.process_image(scaling_factor, tolerance, binary_thresh, adaptive_thresh)
     processor.clean_contours(area_thresh, perimeter_thresh)
