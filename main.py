@@ -56,7 +56,7 @@ class ImageProcessor:
             cv2.polylines(result_image, [contour.astype(np.int32)], isClosed=True, color=color, thickness=2)
         return result_image
 
-    def export_to_mpf(self, filename):
+    def export_to_mpf(self):
         gcode = []
         gcode.append("BEGIN PGM G-CODE EXPORT\n")
         for contour in self.contours:
@@ -69,8 +69,7 @@ class ImageProcessor:
                 gcode.append(f"G1 X{x} Y{y}\n")
             gcode.append("G0 Z10.0\n")  # Подъем инструмента после контура
         gcode.append("END PGM\n")
-        with open(filename, "w") as f:
-            f.writelines(gcode)
+        return "\n".join(gcode)
 
 
 # Настройка Streamlit
@@ -87,7 +86,13 @@ if uploaded_file:
     if "current_contour" not in st.session_state:
         st.session_state.current_contour = 0
 
-    # Фильтры
+    if "contours" not in st.session_state:
+        processor.process_image(1.0, 1.0, 127, False)
+        st.session_state.contours = processor.contours
+
+    processor.contours = st.session_state.contours
+
+    # Боковая панель с фильтрами
     blur = st.sidebar.slider("Размытие", 0, 10, 0)
     contrast = st.sidebar.slider("Контрастность", 1.0, 3.0, 1.0)
     median_filter = st.sidebar.slider("Медианный фильтр", 0, 10, 0)
@@ -95,39 +100,45 @@ if uploaded_file:
     tolerance = st.sidebar.slider("Упрощение контуров", 0.1, 10.0, 1.0)
     binary_thresh = st.sidebar.slider("Порог бинаризации", 0, 255, 127)
     adaptive_thresh = st.sidebar.checkbox("Адаптивная бинаризация")
+    area_thresh = st.sidebar.slider("Минимальная площадь", 1, 1000, 10)
+    perimeter_thresh = st.sidebar.slider("Минимальная длина периметра", 1, 500, 10)
 
-    # Обработка изображения
+    # Фильтрация и обработка
     processor.apply_filters(blur, contrast, median_filter)
     processor.process_image(scaling_factor, tolerance, binary_thresh, adaptive_thresh)
+    processor.clean_contours(area_thresh, perimeter_thresh)
 
-    # Навигация по контурам
+    # Удаление текущего контура
+    if st.button("❌ Удалить текущий контур"):
+        if st.session_state.contours:
+            del st.session_state.contours[st.session_state.current_contour]
+            st.session_state.current_contour = min(
+                st.session_state.current_contour, len(st.session_state.contours) - 1
+            )
+
+    # Навигация
     prev_contour = st.button("⬅ Предыдущий контур")
     next_contour = st.button("Следующий контур ➡")
-    delete_contour = st.button("❌ Удалить текущий контур")
 
     if prev_contour:
         st.session_state.current_contour = max(0, st.session_state.current_contour - 1)
 
     if next_contour:
-        st.session_state.current_contour = min(len(processor.contours) - 1, st.session_state.current_contour + 1)
+        st.session_state.current_contour = min(
+            len(st.session_state.contours) - 1, st.session_state.current_contour + 1
+        )
 
-    if delete_contour:
-        if processor.contours:
-            del processor.contours[st.session_state.current_contour]
-            st.session_state.current_contour = max(0, len(processor.contours) - 1)
-
+    # Отображение текущего контура
     selected_contour = st.session_state.current_contour
     result_image = processor.draw_contours(highlight_index=selected_contour)
     st.image(result_image, caption=f"Текущий контур: {selected_contour}", use_container_width=True)
 
-    # Экспорт в .MPF
+    # Экспорт G-code
     if st.button("Экспортировать в G-code (.MPF)"):
-        filename = "contours.mpf"
-        processor.export_to_mpf(filename)
-        with open(filename, "rb") as f:
-            st.download_button(
-                label="Скачать файл G-code",
-                data=f,
-                file_name=filename,
-                mime="text/plain"
-            )
+        gcode_data = processor.export_to_mpf()
+        st.download_button(
+            label="Скачать G-code",
+            data=gcode_data,
+            file_name="contours.mpf",
+            mime="text/plain"
+        )
