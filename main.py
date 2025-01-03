@@ -111,10 +111,15 @@ if uploaded_file:
     # Удаление текущего контура
     if st.button("❌ Удалить текущий контур"):
         if st.session_state.contours:
+            # Удаляем выбранный контур
             del st.session_state.contours[st.session_state.current_contour]
+            # Корректируем индекс текущего контура
             st.session_state.current_contour = min(
                 st.session_state.current_contour, len(st.session_state.contours) - 1
             )
+            # Перезапускаем обработку после удаления
+            processor.contours = st.session_state.contours
+            processor.draw_contours()
 
     # Навигация
     prev_contour = st.button("⬅ Предыдущий контур")
