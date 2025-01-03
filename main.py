@@ -3,7 +3,6 @@ import cv2
 import numpy as np
 from PIL import Image
 from io import BytesIO
-import plotly.graph_objects as go
 
 
 class ImageProcessor:
@@ -57,34 +56,24 @@ class ImageProcessor:
             cv2.polylines(result_image, [contour.astype(np.int32)], isClosed=True, color=color, thickness=2)
         return result_image
 
-
-# Функция для изменения размера изображений
-def resize_image(image, max_size=1024):
-    h, w = image.shape[:2]
-    if max(h, w) > max_size:
-        scaling_factor = max_size / max(h, w)
-        image = cv2.resize(image, (int(w * scaling_factor), int(h * scaling_factor)))
-    return image
-
-
-# Функция для отображения изображения с Plotly
-def plot_image_with_contours(image, contours, highlight_index=None):
-    fig = go.Figure()
-    fig.add_trace(go.Image(z=image))
-    for idx, contour in enumerate(contours):
-        color = "green" if idx == highlight_index else "magenta"
-        x, y = contour[:, 0, 0], contour[:, 0, 1]
-        fig.add_trace(go.Scatter(x=x, y=y, mode="lines", line=dict(color=color, width=2), name=f"Contour {idx}"))
-    fig.update_layout(
-        xaxis=dict(visible=False),
-        yaxis=dict(visible=False),
-        dragmode="pan",
-        showlegend=False,
-    )
-    return fig
+    def export_to_mpf(self, filename):
+        gcode = []
+        gcode.append("BEGIN PGM G-CODE EXPORT\n")
+        for contour in self.contours:
+            gcode.append("G0 Z10.0\n")  # Подъем инструмента
+            start_point = contour[0][0]
+            gcode.append(f"G0 X{start_point[0]} Y{start_point[1]}\n")  # Переход к стартовой точке
+            gcode.append("G1 Z-1.0\n")  # Опускание инструмента
+            for point in contour:
+                x, y = point[0]
+                gcode.append(f"G1 X{x} Y{y}\n")
+            gcode.append("G0 Z10.0\n")  # Подъем инструмента после контура
+        gcode.append("END PGM\n")
+        with open(filename, "w") as f:
+            f.writelines(gcode)
 
 
-# Настройка страницы Streamlit
+# Настройка Streamlit
 st.set_page_config(page_title="Интерактивная обработка изображений", layout="wide")
 st.title("Интерактивная обработка изображений")
 
@@ -93,50 +82,28 @@ uploaded_file = st.file_uploader("Загрузите изображение", ty
 if uploaded_file:
     op_image = Image.open(uploaded_file)
     image = np.array(op_image)
-    image = resize_image(image)
     processor = ImageProcessor(image)
 
     if "current_contour" not in st.session_state:
         st.session_state.current_contour = 0
 
-    if "history" not in st.session_state:
-        st.session_state.history = []
+    # Фильтры
+    blur = st.sidebar.slider("Размытие", 0, 10, 0)
+    contrast = st.sidebar.slider("Контрастность", 1.0, 3.0, 1.0)
+    median_filter = st.sidebar.slider("Медианный фильтр", 0, 10, 0)
+    scaling_factor = st.sidebar.slider("Масштаб контуров", 0.1, 1.0, 1.0)
+    tolerance = st.sidebar.slider("Упрощение контуров", 0.1, 10.0, 1.0)
+    binary_thresh = st.sidebar.slider("Порог бинаризации", 0, 255, 127)
+    adaptive_thresh = st.sidebar.checkbox("Адаптивная бинаризация")
 
-    # Настройки в боковой панели
-    with st.sidebar:
-        st.header("Настройки")
-        blur = st.slider("Размытие", 0, 10, 0, key="blur")
-        contrast = st.slider("Контрастность", 1.0, 3.0, 1.0, key="contrast")
-        median_filter = st.slider("Медианный фильтр", 0, 10, 0, key="median_filter")
-        scaling_factor = st.slider("Масштаб контуров", 0.1, 1.0, 1.0, key="scaling_factor")
-        tolerance = st.slider("Упрощение контуров", 0.1, 10.0, 1.0, key="tolerance")
-        binary_thresh = st.slider("Порог бинаризации", 0, 255, 127, key="binary_thresh")
-        adaptive_thresh = st.checkbox("Адаптивная бинаризация", key="adaptive_thresh")
-        area_thresh = st.slider("Минимальная площадь", 1, 1000, 10, key="area_thresh")
-        perimeter_thresh = st.slider("Минимальная длина периметра", 1, 500, 10, key="perimeter_thresh")
-
-    filtered_image = processor.apply_filters(
-        blur=st.session_state.blur,
-        contrast=st.session_state.contrast,
-        median_filter=st.session_state.median_filter
-    )
-    filtered_image = cv2.cvtColor(filtered_image, cv2.COLOR_BGR2RGB)
-    st.image(filtered_image, caption="Изображение после фильтрации", use_container_width=True)
-
-    processor.process_image(
-        scaling_factor=st.session_state.scaling_factor,
-        tolerance=st.session_state.tolerance,
-        binary_thresh=st.session_state.binary_thresh,
-        adaptive_thresh=st.session_state.adaptive_thresh
-    )
-    processor.clean_contours(
-        area_thresh=st.session_state.area_thresh,
-        perimeter_thresh=st.session_state.perimeter_thresh
-    )
+    # Обработка изображения
+    processor.apply_filters(blur, contrast, median_filter)
+    processor.process_image(scaling_factor, tolerance, binary_thresh, adaptive_thresh)
 
     # Навигация по контурам
     prev_contour = st.button("⬅ Предыдущий контур")
     next_contour = st.button("Следующий контур ➡")
+    delete_contour = st.button("❌ Удалить текущий контур")
 
     if prev_contour:
         st.session_state.current_contour = max(0, st.session_state.current_contour - 1)
@@ -144,26 +111,23 @@ if uploaded_file:
     if next_contour:
         st.session_state.current_contour = min(len(processor.contours) - 1, st.session_state.current_contour + 1)
 
+    if delete_contour:
+        if processor.contours:
+            del processor.contours[st.session_state.current_contour]
+            st.session_state.current_contour = max(0, len(processor.contours) - 1)
+
     selected_contour = st.session_state.current_contour
     result_image = processor.draw_contours(highlight_index=selected_contour)
     st.image(result_image, caption=f"Текущий контур: {selected_contour}", use_container_width=True)
 
-    # Сохранение состояния
-    if st.button("Сохранить текущее состояние"):
-        st.session_state.history.append(result_image.copy())
-        st.success("Состояние сохранено!")
-
-    if st.session_state.history:
-        history_index = st.selectbox("Выберите состояние из истории:", options=list(range(len(st.session_state.history))))
-        st.image(st.session_state.history[history_index], caption=f"Состояние {history_index}", use_container_width=True)
-
-    buffer = BytesIO()
-    is_success, encoded_image = cv2.imencode('.jpg', result_image)
-    if is_success:
-        buffer.write(encoded_image.tobytes())
-        st.download_button(
-            "Скачать обработанное изображение",
-            data=buffer,
-            file_name="processed_image.jpg",
-            mime="image/jpeg"
-        )
+    # Экспорт в .MPF
+    if st.button("Экспортировать в G-code (.MPF)"):
+        filename = "contours.mpf"
+        processor.export_to_mpf(filename)
+        with open(filename, "rb") as f:
+            st.download_button(
+                label="Скачать файл G-code",
+                data=f,
+                file_name=filename,
+                mime="text/plain"
+            )
