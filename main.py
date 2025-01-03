@@ -49,17 +49,17 @@ class ImageProcessor:
         ]
         return self.contours
 
-    def draw_contours(self, highlight_index=None):
+    def draw_contours(self, contours, highlight_index=None):
         result_image = np.zeros((self.image.shape[0], self.image.shape[1], 3), dtype=np.uint8)
-        for idx, contour in enumerate(self.contours):
+        for idx, contour in enumerate(contours):
             color = (0, 255, 0) if idx == highlight_index else (255, 0, 255)
             cv2.polylines(result_image, [contour.astype(np.int32)], isClosed=True, color=color, thickness=2)
         return result_image
 
-    def export_to_mpf(self):
+    def export_to_mpf(self, contours):
         gcode = []
         gcode.append("BEGIN PGM G-CODE EXPORT\n")
-        for contour in self.contours:
+        for contour in contours:
             gcode.append("G0 Z10.0\n")  # Подъем инструмента
             start_point = contour[0][0]
             gcode.append(f"G0 X{start_point[0]} Y{start_point[1]}\n")  # Переход к стартовой точке
@@ -90,7 +90,8 @@ if uploaded_file:
         processor.process_image(1.0, 1.0, 127, False)
         st.session_state.contours = processor.contours
 
-    processor.contours = st.session_state.contours
+    # Используем список контуров из session_state
+    contours = st.session_state.contours
 
     # Боковая панель с фильтрами
     blur = st.sidebar.slider("Размытие", 0, 10, 0)
@@ -103,23 +104,13 @@ if uploaded_file:
     area_thresh = st.sidebar.slider("Минимальная площадь", 1, 1000, 10)
     perimeter_thresh = st.sidebar.slider("Минимальная длина периметра", 1, 500, 10)
 
-    # Фильтрация и обработка
-    processor.apply_filters(blur, contrast, median_filter)
-    processor.process_image(scaling_factor, tolerance, binary_thresh, adaptive_thresh)
-    processor.clean_contours(area_thresh, perimeter_thresh)
-
     # Удаление текущего контура
     if st.button("❌ Удалить текущий контур"):
-        if st.session_state.contours:
-            # Удаляем выбранный контур
-            del st.session_state.contours[st.session_state.current_contour]
-            # Корректируем индекс текущего контура
+        if contours:
+            del contours[st.session_state.current_contour]
             st.session_state.current_contour = min(
-                st.session_state.current_contour, len(st.session_state.contours) - 1
+                st.session_state.current_contour, len(contours) - 1
             )
-            # Перезапускаем обработку после удаления
-            processor.contours = st.session_state.contours
-            processor.draw_contours()
 
     # Навигация
     prev_contour = st.button("⬅ Предыдущий контур")
@@ -130,17 +121,17 @@ if uploaded_file:
 
     if next_contour:
         st.session_state.current_contour = min(
-            len(st.session_state.contours) - 1, st.session_state.current_contour + 1
+            len(contours) - 1, st.session_state.current_contour + 1
         )
 
     # Отображение текущего контура
     selected_contour = st.session_state.current_contour
-    result_image = processor.draw_contours(highlight_index=selected_contour)
+    result_image = processor.draw_contours(contours, highlight_index=selected_contour)
     st.image(result_image, caption=f"Текущий контур: {selected_contour}", use_container_width=True)
 
     # Экспорт G-code
     if st.button("Экспортировать в G-code (.MPF)"):
-        gcode_data = processor.export_to_mpf()
+        gcode_data = processor.export_to_mpf(contours)
         st.download_button(
             label="Скачать G-code",
             data=gcode_data,
