@@ -113,8 +113,7 @@ if uploaded_file:
             )
 
     # Навигация
-    prev_contour = st.button("⬅ Предыдущий контур")
-    next_contour = st.button("Следующий контур ➡")
+    prev_contour, next_contour = st.button("⬅ Предыдущий контур"), st.button("Следующий контур ➡")st.button("Следующий контур ➡")
 
     if prev_contour:
         st.session_state.current_contour = max(0, st.session_state.current_contour - 1)
