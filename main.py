@@ -5,7 +5,6 @@ from PIL import Image
 from io import BytesIO
 
 
-
 class ImageProcessor:
     def __init__(self, image):
         if not isinstance(image, np.ndarray):
@@ -105,41 +104,36 @@ if uploaded_file:
     area_thresh = st.sidebar.slider("Минимальная площадь", 1, 1000, 10)
     perimeter_thresh = st.sidebar.slider("Минимальная длина периметра", 1, 500, 10)
 
-    
+    # Применяем фильтры и пересчитываем контуры
+    filtered_image = processor.apply_filters(blur, contrast, median_filter)
+    processor.process_image(scaling_factor, tolerance, binary_thresh, adaptive_thresh)
+    processor.clean_contours(area_thresh, perimeter_thresh)
 
-    
+    # Удаление текущего контура
+    if st.button("❌ Удалить текущий контур"):
+        if contours:
+            del contours[st.session_state.current_contour]
+            st.session_state.current_contour = min(
+                st.session_state.current_contour, len(contours) - 1
+            )
+
+    # Навигация
+    prev_contour = st.button("⬅ Предыдущий контур")
+    next_contour = st.button("Следующий контур ➡")
+
+    if prev_contour:
+        st.session_state.current_contour = max(0, st.session_state.current_contour - 1)
+
+    if next_contour:
+        st.session_state.current_contour = min(
+            len(contours) - 1, st.session_state.current_contour + 1
+        )
 
     # Отображение текущего контура
     selected_contour = st.session_state.current_contour
     result_image = processor.draw_contours(contours, highlight_index=selected_contour)
     st.image(result_image, caption=f"Текущий контур: {selected_contour}", use_container_width=True)
 
-
-    col1, col2, col3 = st.columns([1,1,1])
-    with col1:
-        # Удаление текущего контура
-        if st.button("❌ Удалить текущий контур"):
-            if contours:
-                del contours[st.session_state.current_contour]
-                st.session_state.current_contour = min(
-                    st.session_state.current_contour, len(contours) - 1
-                )
-                
-    with col2:
-        # Навигация
-        prev_contour = st.button("⬅ Предыдущий контур") 
-    
-        if prev_contour:
-            st.session_state.current_contour = max(0, st.session_state.current_contour - 1)
-    
-    with col3:
-        next_contour = st.button("Следующий контур ➡")
-
-        if next_contour:
-            st.session_state.current_contour = min(
-                len(contours) - 1, st.session_state.current_contour + 1
-            )
-    
     # Экспорт G-code
     if st.button("Экспортировать в G-code (.MPF)"):
         gcode_data = processor.export_to_mpf(contours)
