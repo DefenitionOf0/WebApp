@@ -4,17 +4,7 @@ import numpy as np
 from PIL import Image
 from io import BytesIO
 
-st.markdown("""
-            <style>
-                div[data-testid="column"] {
-                    width: fit-content !important;
-                    flex: unset;
-                }
-                div[data-testid="column"] * {
-                    width: fit-content !important;
-                }
-            </style>
-            """, unsafe_allow_html=True)
+
 
 class ImageProcessor:
     def __init__(self, image):
