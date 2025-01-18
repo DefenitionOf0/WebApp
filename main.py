@@ -110,7 +110,7 @@ if uploaded_file:
     processor.filtered_image = st.session_state.filtered_image
     
     st.session_state.all_original_contours = processor.process_image(
-        scaling_factor, tolerance, binary_thresh, adaptive_thresh
+        scaling_factor, tolerance, binary_thresh
     )
 
     # Если контуры ещё не рассчитаны
