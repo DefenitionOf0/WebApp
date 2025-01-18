@@ -89,9 +89,6 @@ if uploaded_file:
     if "filtered_image" not in st.session_state:
         st.session_state.filtered_image = None
 
-    if "binary_image" not in st.session_state:
-        st.session_state.binary_image = None
-
     if "current_contour" not in st.session_state:
         st.session_state.current_contour = 0
 
@@ -106,11 +103,14 @@ if uploaded_file:
     area_thresh = st.sidebar.slider("Минимальная площадь", 1, 1000, 10)
     perimeter_thresh = st.sidebar.slider("Минимальная длина периметра", 1, 500, 10)
 
-    # Применение фильтров и пересчёт контуров
-    st.session_state.filtered_image = processor.apply_filters(blur, contrast, median_filter)
+    # Применение фильтров и начальный расчёт контуров
+    if st.session_state.filtered_image is None:
+        st.session_state.filtered_image = processor.apply_filters(blur, contrast, median_filter)
     processor.filtered_image = st.session_state.filtered_image
-    st.session_state.contours = processor.process_image(scaling_factor, tolerance, binary_thresh, adaptive_thresh)
-    processor.clean_contours(area_thresh, perimeter_thresh)
+
+    if st.session_state.contours is None:
+        st.session_state.contours = processor.process_image(scaling_factor, tolerance, binary_thresh, adaptive_thresh)
+        processor.clean_contours(area_thresh, perimeter_thresh)
 
     # Выбор текущего контура
     selected_contour_idx = st.sidebar.selectbox(
@@ -120,16 +120,6 @@ if uploaded_file:
         index=st.session_state.current_contour if st.session_state.contours else 0
     )
     st.session_state.current_contour = selected_contour_idx
-
-    # Массовое удаление контуров по площади
-    min_area = st.sidebar.number_input("Мин. площадь для удаления", min_value=1, value=10)
-    max_area = st.sidebar.number_input("Макс. площадь для удаления", min_value=1, value=500)
-    if st.sidebar.button("Удалить контуры по площади"):
-        st.session_state.contours = [
-            contour for contour in st.session_state.contours
-            if min_area <= cv2.contourArea(contour) <= max_area
-        ]
-        st.success(f"Контуры вне диапазона [{min_area}, {max_area}] удалены.")
 
     # Удаление текущего контура
     if st.sidebar.button("Удалить выбранный контур"):
