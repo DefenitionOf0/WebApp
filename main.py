@@ -112,6 +112,14 @@ if uploaded_file:
     st.session_state.contours = processor.process_image(scaling_factor, tolerance, binary_thresh, adaptive_thresh)
     processor.clean_contours(area_thresh, perimeter_thresh)
 
+    # Отображение изображений
+    st.image(st.session_state.filtered_image, caption="Фильтрованное изображение", use_container_width=True)
+
+    # Отображение контуров
+    selected_contour = st.session_state.current_contour
+    result_image = processor.draw_contours(st.session_state.contours, highlight_index=selected_contour)
+    st.image(result_image, caption="Контуры", use_container_width=True)
+
     # Удаление текущего контура
     if st.button("❌ Удалить текущий контур"):
         if st.session_state.contours:
@@ -131,14 +139,6 @@ if uploaded_file:
         st.session_state.current_contour = min(
             len(st.session_state.contours) - 1, st.session_state.current_contour + 1
         )
-
-    # Отображение изображений
-    st.image(st.session_state.filtered_image, caption="Фильтрованное изображение", use_container_width=True)
-
-    # Отображение контуров
-    selected_contour = st.session_state.current_contour
-    result_image = processor.draw_contours(st.session_state.contours, highlight_index=selected_contour)
-    st.image(result_image, caption="Контуры", use_container_width=True)
 
     # Экспорт G-code
     if st.button("Экспортировать в G-code (.MPF)"):
