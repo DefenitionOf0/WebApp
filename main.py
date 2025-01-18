@@ -74,8 +74,6 @@ class ImageProcessor:
 # Настройка Streamlit
 st.set_page_config(page_title="Интерактивная обработка изображений", layout="wide")
 st.title("Интерактивная обработка изображений")
-with st.popover("UNDER CONSTRUCTION"):
-    st.image("360_F_259103033_NfpumeICub5vwLoSB2NQa05fzYpnNQMb.jpg", width=200, caption="Возможны внезапные изменения;)", use_container_width=False)
 
 uploaded_file = st.file_uploader("Загрузите изображение", type=["jpg", "png", "jpeg"])
 
@@ -105,16 +103,16 @@ if uploaded_file:
     area_thresh = st.sidebar.slider("Минимальная площадь", 1, 1000, 10)
     perimeter_thresh = st.sidebar.slider("Минимальная длина периметра", 1, 500, 10)
 
-    # Применение фильтров и пересчёт контуров
+    # Применение фильтров к изображению
     st.session_state.filtered_image = processor.apply_filters(blur, contrast, median_filter)
     processor.filtered_image = st.session_state.filtered_image
 
-    if st.session_state.all_original_contours is None:
-        st.session_state.all_original_contours = processor.process_image(
-            scaling_factor, tolerance, binary_thresh, adaptive_thresh
-        )
+    # Пересчёт контуров при изменении параметров
+    st.session_state.all_original_contours = processor.process_image(
+        scaling_factor, tolerance, binary_thresh, adaptive_thresh
+    )
 
-    # Применение фильтров минимальной площади и периметра
+    # Применение фильтров площади и периметра
     st.session_state.filtered_contours = processor.filter_contours(
         st.session_state.all_original_contours, area_thresh, perimeter_thresh
     )
@@ -152,7 +150,7 @@ if uploaded_file:
     st.image(result_image, caption="Контуры", use_container_width=True)
 
     # Экспорт G-code
-    if st.button("Экспортировать в G-code (.MPF)[ЕЩЕ НЕ ГОТОВО, СЫРОЙ ШАБЛОН]"):
+    if st.button("Экспортировать в G-code (.MPF)"):
         gcode_data = processor.export_to_mpf(st.session_state.filtered_contours)
         st.download_button(
             label="Скачать G-code",
