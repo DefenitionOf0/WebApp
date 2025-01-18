@@ -146,7 +146,7 @@ if uploaded_file:
     st.image(result_image, caption="Контуры", use_container_width=True)
 
     # Экспорт G-code
-    if st.button("Экспортировать в G-code (.MPF)"):
+    if st.button("Экспортировать в G-code (.MPF)[Пока не работает, шаблон есть, но не полный и не настроен]"):
         gcode_data = processor.export_to_mpf(st.session_state.current_contours)
         st.download_button(
             label="Скачать G-code",
