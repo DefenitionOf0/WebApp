@@ -108,9 +108,10 @@ if uploaded_file:
     processor.filtered_image = st.session_state.filtered_image
 
     # Пересчёт контуров при изменении параметров
-    st.session_state.all_original_contours = processor.process_image(
-        scaling_factor, tolerance, binary_thresh, adaptive_thresh
-    )
+    if st.session_state.all_original_contours is None:
+        st.session_state.all_original_contours = processor.process_image(
+            scaling_factor, tolerance, binary_thresh, adaptive_thresh
+        )
 
     # Применение фильтров площади и периметра
     st.session_state.filtered_contours = processor.filter_contours(
@@ -130,6 +131,7 @@ if uploaded_file:
     if st.sidebar.button("Удалить выбранный контур"):
         if st.session_state.filtered_contours:
             contour_to_delete = st.session_state.filtered_contours[st.session_state.current_contour]
+            # Удалить контур из всех списков
             st.session_state.all_original_contours = [
                 contour for contour in st.session_state.all_original_contours
                 if not np.array_equal(contour, contour_to_delete)
