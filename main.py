@@ -115,8 +115,9 @@ if uploaded_file:
         st.session_state.all_original_contours = processor.process_image(
             st.session_state.all_original_contours, tolerance, binary_thresh, adaptive_thresh
         )
-        st.session_state.filtered_contours = processor.filter_contours(
-        scaling_factor, tolerance, binary_thresh, adaptive_thresh
+
+    st.session_state.filtered_contours = processor.filter_contours(
+    st.session_state.all_original_contours, tolerance, binary_thresh, adaptive_thresh
     )
  
     # Применение фильтров площади и периметра
