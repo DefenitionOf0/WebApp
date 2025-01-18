@@ -108,11 +108,14 @@ if uploaded_file:
     processor.filtered_image = st.session_state.filtered_image
 
     # Если контуры ещё не рассчитаны
-    if st.session_state.all_original_contours:
+    if st.session_state.all_original_contours is None:
         st.session_state.all_original_contours = processor.process_image(
             scaling_factor, tolerance, binary_thresh, adaptive_thresh
         )
 
+    st.session_state.all_original_contours = processor.process_image(
+        scaling_factor, tolerance, binary_thresh, adaptive_thresh
+    )
     # Применение фильтров площади и периметра
     st.session_state.filtered_contours = processor.filter_contours(
         st.session_state.all_original_contours, area_thresh, perimeter_thresh
