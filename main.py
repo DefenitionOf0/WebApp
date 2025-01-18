@@ -112,6 +112,34 @@ if uploaded_file:
     st.session_state.contours = processor.process_image(scaling_factor, tolerance, binary_thresh, adaptive_thresh)
     processor.clean_contours(area_thresh, perimeter_thresh)
 
+    # Выбор текущего контура
+    selected_contour_idx = st.sidebar.selectbox(
+        "Выберите контур:",
+        options=range(len(st.session_state.contours)) if st.session_state.contours else [],
+        format_func=lambda idx: f"Контур {idx + 1}",
+        index=st.session_state.current_contour if st.session_state.contours else 0
+    )
+    st.session_state.current_contour = selected_contour_idx
+
+    # Массовое удаление контуров по площади
+    min_area = st.sidebar.number_input("Мин. площадь для удаления", min_value=1, value=10)
+    max_area = st.sidebar.number_input("Макс. площадь для удаления", min_value=1, value=500)
+    if st.sidebar.button("Удалить контуры по площади"):
+        st.session_state.contours = [
+            contour for contour in st.session_state.contours
+            if min_area <= cv2.contourArea(contour) <= max_area
+        ]
+        st.success(f"Контуры вне диапазона [{min_area}, {max_area}] удалены.")
+
+    # Удаление текущего контура
+    if st.sidebar.button("Удалить выбранный контур"):
+        if st.session_state.contours:
+            st.session_state.contours.pop(st.session_state.current_contour)
+            st.session_state.current_contour = min(
+                st.session_state.current_contour, len(st.session_state.contours) - 1
+            )
+            st.success("Выбранный контур удалён.")
+
     # Отображение изображений
     st.image(st.session_state.filtered_image, caption="Фильтрованное изображение", use_container_width=True)
 
@@ -119,25 +147,6 @@ if uploaded_file:
     selected_contour = st.session_state.current_contour
     result_image = processor.draw_contours(st.session_state.contours, highlight_index=selected_contour)
     st.image(result_image, caption="Контуры", use_container_width=True)
-
-    # Удаление текущего контура
-    if st.button("❌ Удалить текущий контур"):
-        del st.session_state.contours[st.session_state.current_contour]
-        st.session_state.current_contour = min(
-            st.session_state.current_contour, len(st.session_state.contours) - 1
-            )
-
-    # Навигация
-    prev_contour = st.button("⬅ Предыдущий контур")
-    next_contour = st.button("Следующий контур ➡")
-
-    if prev_contour:
-        st.session_state.current_contour = max(0, st.session_state.current_contour - 1)
-
-    if next_contour:
-        st.session_state.current_contour = min(
-            len(st.session_state.contours) - 1, st.session_state.current_contour + 1
-        )
 
     # Экспорт G-code
     if st.button("Экспортировать в G-code (.MPF)"):
