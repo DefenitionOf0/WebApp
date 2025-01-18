@@ -41,12 +41,12 @@ class ImageProcessor:
         ]
         return self.contours
 
-    def clean_contours(self, area_thresh, perimeter_thresh):
-        self.contours = [
-            contour for contour in self.contours
+    def filter_contours(self, contours, area_thresh, perimeter_thresh):
+        """Фильтрует контуры по площади и длине периметра."""
+        return [
+            contour for contour in contours
             if cv2.contourArea(contour) >= area_thresh and cv2.arcLength(contour, closed=True) >= perimeter_thresh
         ]
-        return self.contours
 
     def draw_contours(self, contours, highlight_index=None):
         result_image = np.zeros((self.image.shape[0], self.image.shape[1], 3), dtype=np.uint8)
@@ -84,9 +84,9 @@ if uploaded_file:
 
     # Сохранение состояния
     if "original_contours" not in st.session_state:
-        st.session_state.original_contours = None  # Исходный список контуров
-    if "current_contours" not in st.session_state:
-        st.session_state.current_contours = None  # Текущий список контуров
+        st.session_state.original_contours = None
+    if "filtered_contours" not in st.session_state:
+        st.session_state.filtered_contours = None
     if "filtered_image" not in st.session_state:
         st.session_state.filtered_image = None
     if "current_contour" not in st.session_state:
@@ -103,37 +103,35 @@ if uploaded_file:
     area_thresh = st.sidebar.slider("Минимальная площадь", 1, 1000, 10)
     perimeter_thresh = st.sidebar.slider("Минимальная длина периметра", 1, 500, 10)
 
-    # Обновление изображения при изменении фильтров
+    # Применение фильтров и пересчёт контуров
     st.session_state.filtered_image = processor.apply_filters(blur, contrast, median_filter)
     processor.filtered_image = st.session_state.filtered_image
 
-    # Пересчёт контуров при необходимости
-    if st.sidebar.button("Пересчитать контуры"):
-        st.session_state.original_contours = processor.process_image(scaling_factor, tolerance, binary_thresh, adaptive_thresh)
-        processor.clean_contours(area_thresh, perimeter_thresh)
-        st.session_state.current_contours = st.session_state.original_contours.copy()
-
-    # Инициализация контуров при загрузке
     if st.session_state.original_contours is None:
-        st.session_state.original_contours = processor.process_image(scaling_factor, tolerance, binary_thresh, adaptive_thresh)
-        processor.clean_contours(area_thresh, perimeter_thresh)
-        st.session_state.current_contours = st.session_state.original_contours.copy()
+        st.session_state.original_contours = processor.process_image(
+            scaling_factor, tolerance, binary_thresh, adaptive_thresh
+        )
+    
+    # Применение фильтров минимальной площади и периметра
+    st.session_state.filtered_contours = processor.filter_contours(
+        st.session_state.original_contours, area_thresh, perimeter_thresh
+    )
 
     # Выбор текущего контура
     selected_contour_idx = st.sidebar.selectbox(
         "Выберите контур:",
-        options=range(len(st.session_state.current_contours)) if st.session_state.current_contours else [],
+        options=range(len(st.session_state.filtered_contours)) if st.session_state.filtered_contours else [],
         format_func=lambda idx: f"Контур {idx + 1}",
-        index=st.session_state.current_contour if st.session_state.current_contours else 0
+        index=st.session_state.current_contour if st.session_state.filtered_contours else 0
     )
     st.session_state.current_contour = selected_contour_idx
 
     # Удаление текущего контура
     if st.sidebar.button("Удалить выбранный контур"):
-        if st.session_state.current_contours:
-            st.session_state.current_contours.pop(st.session_state.current_contour)
+        if st.session_state.filtered_contours:
+            st.session_state.filtered_contours.pop(st.session_state.current_contour)
             st.session_state.current_contour = min(
-                st.session_state.current_contour, len(st.session_state.current_contours) - 1
+                st.session_state.current_contour, len(st.session_state.filtered_contours) - 1
             )
             st.success("Выбранный контур удалён.")
 
@@ -142,12 +140,12 @@ if uploaded_file:
 
     # Отображение контуров
     selected_contour = st.session_state.current_contour
-    result_image = processor.draw_contours(st.session_state.current_contours, highlight_index=selected_contour)
+    result_image = processor.draw_contours(st.session_state.filtered_contours, highlight_index=selected_contour)
     st.image(result_image, caption="Контуры", use_container_width=True)
 
     # Экспорт G-code
-    if st.button("Экспортировать в G-code (.MPF)[Пока не работает, шаблон есть, но не полный и не настроен]"):
-        gcode_data = processor.export_to_mpf(st.session_state.current_contours)
+    if st.button("Экспортировать в G-code (.MPF)"):
+        gcode_data = processor.export_to_mpf(st.session_state.filtered_contours)
         st.download_button(
             label="Скачать G-code",
             data=gcode_data,
