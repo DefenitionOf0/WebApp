@@ -122,10 +122,9 @@ if uploaded_file:
 
     # Удаление текущего контура
     if st.button("❌ Удалить текущий контур"):
-        if st.session_state.contours:
-            del st.session_state.contours[st.session_state.current_contour]
-            st.session_state.current_contour = min(
-                st.session_state.current_contour, len(st.session_state.contours) - 1
+        del st.session_state.contours[st.session_state.current_contour]
+        st.session_state.current_contour = min(
+            st.session_state.current_contour, len(st.session_state.contours) - 1
             )
 
     # Навигация
