@@ -70,10 +70,11 @@ class ImageProcessor:
         gcode.append("END PGM\n")
         return "\n".join(gcode)
 
-st.image("2772812-middle.png", caption="Возможны внезапные изменения;)", use_container_width=True)
+
 # Настройка Streamlit
 st.set_page_config(page_title="Интерактивная обработка изображений", layout="wide")
 st.title("Интерактивная обработка изображений")
+st.image("2772812-middle.png", caption="Возможны внезапные изменения;)", use_container_width=True)
 
 uploaded_file = st.file_uploader("Загрузите изображение", type=["jpg", "png", "jpeg"])
 
