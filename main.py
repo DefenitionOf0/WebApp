@@ -74,7 +74,7 @@ class ImageProcessor:
 # Настройка Streamlit
 st.set_page_config(page_title="Интерактивная обработка изображений", layout="wide")
 st.title("Интерактивная обработка изображений")
-st.image("2772812-middle.png", caption="Возможны внезапные изменения;)", use_container_width=True)
+st.image("360_F_259103033_NfpumeICub5vwLoSB2NQa05fzYpnNQMb.jpg", caption="Возможны внезапные изменения;)", use_container_width=True)
 
 uploaded_file = st.file_uploader("Загрузите изображение", type=["jpg", "png", "jpeg"])
 
