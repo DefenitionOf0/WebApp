@@ -103,12 +103,14 @@ if uploaded_file:
     area_thresh = st.sidebar.slider("Минимальная площадь", 1, 1000, 10)
     perimeter_thresh = st.sidebar.slider("Минимальная длина периметра", 1, 500, 10)
 
+    st.session_state.all_original_contours = processor.process_image(
+        scaling_factor, tolerance, binary_thresh, adaptive_thresh
+    )
+
     # Применение фильтров к изображению
     st.session_state.filtered_image = processor.apply_filters(blur, contrast, median_filter)
     processor.filtered_image = st.session_state.filtered_image
-    st.session_state.filtered_contours = processor.process_image(
-        scaling_factor, tolerance, binary_thresh, adaptive_thresh
-    )
+    
     # Если контуры ещё не рассчитаны
     if st.session_state.all_original_contours is None:
         st.session_state.all_original_contours = processor.process_image(
