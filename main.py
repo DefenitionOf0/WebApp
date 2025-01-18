@@ -84,13 +84,11 @@ if uploaded_file:
 
     # Сохранение состояния
     if "original_contours" not in st.session_state:
-        st.session_state.original_contours = None
-    if "filtered_contours" not in st.session_state:
-        st.session_state.filtered_contours = None
+        st.session_state.original_contours = None  # Список всех контуров
     if "filtered_image" not in st.session_state:
-        st.session_state.filtered_image = None
+        st.session_state.filtered_image = None  # Обработанное изображение
     if "current_contour" not in st.session_state:
-        st.session_state.current_contour = 0
+        st.session_state.current_contour = 0  # Индекс выбранного контура
 
     # Боковая панель с фильтрами
     blur = st.sidebar.slider("Размытие", 0, 10, 0)
@@ -111,28 +109,30 @@ if uploaded_file:
         st.session_state.original_contours = processor.process_image(
             scaling_factor, tolerance, binary_thresh, adaptive_thresh
         )
-    
+
     # Применение фильтров минимальной площади и периметра
-    st.session_state.filtered_contours = processor.filter_contours(
+    filtered_contours = processor.filter_contours(
         st.session_state.original_contours, area_thresh, perimeter_thresh
     )
 
     # Выбор текущего контура
     selected_contour_idx = st.sidebar.selectbox(
         "Выберите контур:",
-        options=range(len(st.session_state.filtered_contours)) if st.session_state.filtered_contours else [],
+        options=range(len(filtered_contours)) if filtered_contours else [],
         format_func=lambda idx: f"Контур {idx + 1}",
-        index=st.session_state.current_contour if st.session_state.filtered_contours else 0
+        index=st.session_state.current_contour if filtered_contours else 0
     )
     st.session_state.current_contour = selected_contour_idx
 
     # Удаление текущего контура
     if st.sidebar.button("Удалить выбранный контур"):
-        if st.session_state.filtered_contours:
-            st.session_state.filtered_contours.pop(st.session_state.current_contour)
-            st.session_state.current_contour = min(
-                st.session_state.current_contour, len(st.session_state.filtered_contours) - 1
-            )
+        if filtered_contours:
+            contour_to_delete = filtered_contours[st.session_state.current_contour]
+            st.session_state.original_contours = [
+                contour for contour in st.session_state.original_contours
+                if not np.array_equal(contour, contour_to_delete)
+            ]
+            st.session_state.current_contour = 0
             st.success("Выбранный контур удалён.")
 
     # Отображение изображений
@@ -140,12 +140,12 @@ if uploaded_file:
 
     # Отображение контуров
     selected_contour = st.session_state.current_contour
-    result_image = processor.draw_contours(st.session_state.filtered_contours, highlight_index=selected_contour)
+    result_image = processor.draw_contours(filtered_contours, highlight_index=selected_contour)
     st.image(result_image, caption="Контуры", use_container_width=True)
 
     # Экспорт G-code
     if st.button("Экспортировать в G-code (.MPF)"):
-        gcode_data = processor.export_to_mpf(st.session_state.filtered_contours)
+        gcode_data = processor.export_to_mpf(filtered_contours)
         st.download_button(
             label="Скачать G-code",
             data=gcode_data,
