@@ -116,8 +116,8 @@ if uploaded_file:
     perimeter_thresh = st.sidebar.slider("Минимальная длина периметра", 1, 500, 10)
 
     # Применение фильтров к изображению
-    st.session_state.filtered_image = processor.apply_filters(blur, contrast, median_filter)
-    processor.filtered_image = st.session_state.filtered_image
+    ##st.session_state.filtered_image = processor.apply_filters(blur, contrast, median_filter)
+    ##processor.filtered_image = st.session_state.filtered_image
 
     # Пересчёт контуров
     st.session_state.primary_contours = processor.process_image(
