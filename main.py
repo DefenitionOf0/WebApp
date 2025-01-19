@@ -105,9 +105,9 @@ if uploaded_file:
     processor = ImageProcessor(image)
 
     # Боковая панель с фильтрами
-    blur = st.sidebar.slider("Размытие", 0, 10, 0)
-    contrast = st.sidebar.slider("Контрастность", 1.0, 3.0, 1.0)
-    median_filter = st.sidebar.slider("Медианный фильтр", 0, 10, 0)
+    #blur = st.sidebar.slider("Размытие", 0, 10, 0)
+    #contrast = st.sidebar.slider("Контрастность", 1.0, 3.0, 1.0)
+    #median_filter = st.sidebar.slider("Медианный фильтр", 0, 10, 0)
     scaling_factor = st.sidebar.slider("Масштаб контуров", 0.1, 1.0, 1.0)
     tolerance = st.sidebar.slider("Упрощение контуров", 0.1, 10.0, 1.0)
     binary_thresh = st.sidebar.slider("Порог бинаризации", 0, 255, 127)
