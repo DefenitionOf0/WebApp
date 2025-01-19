@@ -75,22 +75,39 @@ class ImageProcessor:
 st.set_page_config(page_title="Интерактивная обработка изображений", layout="wide")
 st.title("Интерактивная обработка изображений")
 
+
+# Функция для сброса состояния
+def reset_state():
+    """Сбрасывает состояние контуров и обработанных данных."""
+    st.session_state.all_original_contours = None
+    st.session_state.filtered_contours = None
+    st.session_state.filtered_image = None
+    st.session_state.current_contour = 0
+
+
+# Загрузка изображения
 uploaded_file = st.file_uploader("Загрузите изображение", type=["jpg", "png", "jpeg"])
 
 if uploaded_file:
+    # Сбрасываем состояние при загрузке нового изображения
+    if "last_uploaded_file" not in st.session_state or st.session_state.last_uploaded_file != uploaded_file:
+        reset_state()  # Сбрасываем состояние
+        st.session_state.last_uploaded_file = uploaded_file
+
+    # Обрабатываем изображение
     op_image = Image.open(uploaded_file)
     image = np.array(op_image)
     processor = ImageProcessor(image)
 
-    # Сохранение состояния
+    # Инициализация состояния, если оно пустое
     if "all_original_contours" not in st.session_state:
-        st.session_state.all_original_contours = None  # Список всех контуров
+        st.session_state.all_original_contours = None
     if "filtered_contours" not in st.session_state:
-        st.session_state.filtered_contours = None  # Отфильтрованные контуры
+        st.session_state.filtered_contours = None
     if "filtered_image" not in st.session_state:
-        st.session_state.filtered_image = None  # Обработанное изображение
+        st.session_state.filtered_image = None
     if "current_contour" not in st.session_state:
-        st.session_state.current_contour = 0  # Индекс выбранного контура
+        st.session_state.current_contour = 0
 
     # Боковая панель с фильтрами
     blur = st.sidebar.slider("Размытие", 0, 10, 0)
@@ -107,7 +124,7 @@ if uploaded_file:
     st.session_state.filtered_image = processor.apply_filters(blur, contrast, median_filter)
     processor.filtered_image = st.session_state.filtered_image
 
-    # Если контуры ещё не рассчитаны
+    # Пересчёт контуров
     if st.session_state.all_original_contours is None:
         st.session_state.all_original_contours = processor.process_image(
             scaling_factor, tolerance, binary_thresh, adaptive_thresh
