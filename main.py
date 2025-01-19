@@ -14,6 +14,7 @@ class ImageProcessor:
         self.contours = None
 
     def apply_filters(self, blur, contrast, median_filter):
+        """Применяет фильтры размытия, контрастности и медианного фильтра к изображению."""
         img = self.image.copy()
         if blur > 0:
             img = cv2.GaussianBlur(img, (blur * 2 + 1, blur * 2 + 1), 0)
@@ -25,6 +26,7 @@ class ImageProcessor:
         return img
 
     def process_image(self, scaling_factor, tolerance, binary_thresh, adaptive_thresh):
+        """Рассчитывает контуры на основе обработанного изображения."""
         gray = cv2.cvtColor(self.filtered_image, cv2.COLOR_BGR2GRAY) if len(self.filtered_image.shape) == 3 else self.filtered_image
         inverted_image = cv2.bitwise_not(gray)
         if adaptive_thresh:
@@ -49,6 +51,7 @@ class ImageProcessor:
         ]
 
     def draw_contours(self, contours, highlight_index=None):
+        """Рисует контуры на пустом изображении."""
         result_image = np.zeros((self.image.shape[0], self.image.shape[1], 3), dtype=np.uint8)
         for idx, contour in enumerate(contours):
             color = (0, 255, 0) if idx == highlight_index else (255, 0, 255)
@@ -56,6 +59,7 @@ class ImageProcessor:
         return result_image
 
     def export_to_mpf(self, contours):
+        """Экспортирует контуры в формате G-code."""
         gcode = []
         gcode.append("BEGIN PGM G-CODE EXPORT\n")
         for contour in contours:
@@ -99,16 +103,6 @@ if uploaded_file:
     image = np.array(op_image)
     processor = ImageProcessor(image)
 
-    # Инициализация состояния, если оно пустое
-    if "all_original_contours" not in st.session_state:
-        st.session_state.all_original_contours = None
-    if "filtered_contours" not in st.session_state:
-        st.session_state.filtered_contours = None
-    if "filtered_image" not in st.session_state:
-        st.session_state.filtered_image = None
-    if "current_contour" not in st.session_state:
-        st.session_state.current_contour = 0
-
     # Боковая панель с фильтрами
     blur = st.sidebar.slider("Размытие", 0, 10, 0)
     contrast = st.sidebar.slider("Контрастность", 1.0, 3.0, 1.0)
@@ -124,11 +118,10 @@ if uploaded_file:
     st.session_state.filtered_image = processor.apply_filters(blur, contrast, median_filter)
     processor.filtered_image = st.session_state.filtered_image
 
-    # Если контуры ещё не рассчитаны
-    if st.session_state.all_original_contours is None:
-        st.session_state.all_original_contours = processor.process_image(
-            scaling_factor, tolerance, binary_thresh, adaptive_thresh
-        )
+    # Пересчёт контуров
+    st.session_state.all_original_contours = processor.process_image(
+        scaling_factor, tolerance, binary_thresh, adaptive_thresh
+    )
 
     # Применение фильтров площади и периметра
     st.session_state.filtered_contours = processor.filter_contours(
