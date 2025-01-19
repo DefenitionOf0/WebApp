@@ -42,10 +42,12 @@ class ImageProcessor:
                         for i, contour in enumerate(contours) if len(contour) >= 3}
         return contour_dict
 
-    def filter_contours(self, contours, area_thresh, perimeter_thresh):
-        """Фильтрует контуры по площади и длине периметра."""
+    def filter_contours(self, contours, area_thresh, perimeter_thresh, removed_ids):
+        """Фильтрует контуры по площади, длине периметра и удалённым ID."""
         filtered_dict = {id_: contour for id_, contour in contours.items()
-                         if cv2.contourArea(contour) >= area_thresh and cv2.arcLength(contour, closed=True) >= perimeter_thresh}
+                         if id_ not in removed_ids and
+                         cv2.contourArea(contour) >= area_thresh and
+                         cv2.arcLength(contour, closed=True) >= perimeter_thresh}
         return filtered_dict
 
     def draw_contours(self, contours, highlight_id=None):
@@ -82,7 +84,8 @@ st.title("Интерактивная обработка изображений")
 def reset_state():
     """Сбрасывает состояние контуров и обработанных данных."""
     st.session_state.primary_contours = None  # Все пересчитанные контуры с ID
-    st.session_state.secondary_contours = None  # Отфильтрованные и оставшиеся после редактирования контуры
+    st.session_state.secondary_contours = None  # Отфильтрованные контуры (с учётом удалений)
+    st.session_state.removed_contour_ids = set()  # ID удалённых контуров
     st.session_state.filtered_image = None
     st.session_state.current_contour_id = None  # ID текущего выделенного контура
 
@@ -121,13 +124,9 @@ if uploaded_file:
         scaling_factor, tolerance, binary_thresh, adaptive_thresh
     )
 
-    # Если контуры ещё не инициализированы, инициализируем их
-    if st.session_state.secondary_contours is None:
-        st.session_state.secondary_contours = st.session_state.primary_contours.copy()
-
-    # Применение фильтров площади и периметра
+    # Применение фильтров площади и периметра с учётом удалённых контуров
     st.session_state.secondary_contours = processor.filter_contours(
-        st.session_state.primary_contours, area_thresh, perimeter_thresh
+        st.session_state.primary_contours, area_thresh, perimeter_thresh, st.session_state.removed_contour_ids
     )
 
     # Выбор текущего контура
@@ -141,9 +140,9 @@ if uploaded_file:
     # Удаление текущего контура
     if st.sidebar.button("Удалить выбранный контур"):
         if st.session_state.current_contour_id in st.session_state.secondary_contours:
-            del st.session_state.secondary_contours[st.session_state.current_contour_id]
-            st.session_state.current_contour_id = None
-            st.success("Выбранный контур удалён.")
+            # Добавляем ID контура в список удалённых
+            st.session_state.removed_contour_ids.add(st.session_state.current_contour_id)
+            st.success(f"Контур {st.session_state.current_contour_id + 1} удалён.")
 
     # Отображение изображений
     st.image(st.session_state.filtered_image, caption="Фильтрованное изображение", use_container_width=True)
