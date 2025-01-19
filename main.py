@@ -118,17 +118,24 @@ if uploaded_file:
 
     # Кнопка "Применить" для фильтров изображения
     if st.sidebar.button("Применить фильтры") and not st.session_state.filters_locked:
+        # Применяем фильтры и пересчитываем обработанное изображение
         st.session_state.filtered_image = processor.apply_filters(blur, contrast, median_filter)
         processor.filtered_image = st.session_state.filtered_image
 
-        # Пересчёт контуров
+        # Пересчитываем контуры для нового обработанного изображения
         st.session_state.primary_contours = processor.process_image(
             scaling_factor, tolerance, binary_thresh, adaptive_thresh
         )
 
-        # Инициализация отфильтрованных контуров
+        # Инициализируем отфильтрованные контуры
         st.session_state.secondary_contours = st.session_state.primary_contours.copy()
         st.success("Фильтры применены!")
+
+    # Проверяем, есть ли обработанное изображение для отображения
+    if st.session_state.filtered_image is not None:
+        st.image(st.session_state.filtered_image, caption="Фильтрованное изображение", use_container_width=True)
+    else:
+        st.warning("Фильтрованное изображение не готово. Примените фильтры и нажмите кнопку 'Применить'.")
 
     # Фильтры площади и периметра
     if st.session_state.primary_contours:
@@ -151,9 +158,6 @@ if uploaded_file:
             st.session_state.removed_contour_ids.add(st.session_state.current_contour_id)
             st.session_state.filters_locked = True  # Блокируем изменение фильтров
             st.success(f"Контур {st.session_state.current_contour_id + 1} удалён.")
-
-    # Отображение изображений
-    st.image(st.session_state.filtered_image, caption="Фильтрованное изображение", use_container_width=True)
 
     # Отображение контуров
     if st.session_state.secondary_contours:
