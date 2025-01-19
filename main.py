@@ -87,7 +87,6 @@ def reset_state():
     st.session_state.secondary_contours = None  # Отфильтрованные контуры (с учётом удалений)
     st.session_state.removed_contour_ids = set()  # ID удалённых контуров
     st.session_state.filtered_image = None
-    st.session_state.filters_locked = False  # Разрешает применение фильтров
     st.session_state.current_contour_id = None  # ID текущего выделенного контура
 
 
@@ -106,9 +105,9 @@ if uploaded_file:
     processor = ImageProcessor(image)
 
     # Боковая панель с фильтрами
-    blur = st.sidebar.slider("Размытие", 0, 10, 0, disabled=st.session_state.filters_locked)
-    contrast = st.sidebar.slider("Контрастность", 1.0, 3.0, 1.0, disabled=st.session_state.filters_locked)
-    median_filter = st.sidebar.slider("Медианный фильтр", 0, 10, 0, disabled=st.session_state.filters_locked)
+    blur = st.sidebar.slider("Размытие", 0, 10, 0)
+    contrast = st.sidebar.slider("Контрастность", 1.0, 3.0, 1.0)
+    median_filter = st.sidebar.slider("Медианный фильтр", 0, 10, 0)
     scaling_factor = st.sidebar.slider("Масштаб контуров", 0.1, 1.0, 1.0)
     tolerance = st.sidebar.slider("Упрощение контуров", 0.1, 10.0, 1.0)
     binary_thresh = st.sidebar.slider("Порог бинаризации", 0, 255, 127)
@@ -116,56 +115,44 @@ if uploaded_file:
     area_thresh = st.sidebar.slider("Минимальная площадь", 1, 1000, 10)
     perimeter_thresh = st.sidebar.slider("Минимальная длина периметра", 1, 500, 10)
 
-    # Кнопка "Применить" для фильтров изображения
-    if st.sidebar.button("Применить фильтры") and not st.session_state.filters_locked:
-        # Применяем фильтры и пересчитываем обработанное изображение
-        st.session_state.filtered_image = processor.apply_filters(blur, contrast, median_filter)
-        processor.filtered_image = st.session_state.filtered_image
+    # Применение фильтров к изображению
+    st.session_state.filtered_image = processor.apply_filters(blur, contrast, median_filter)
+    processor.filtered_image = st.session_state.filtered_image
 
-        # Пересчитываем контуры для нового обработанного изображения
-        st.session_state.primary_contours = processor.process_image(
-            scaling_factor, tolerance, binary_thresh, adaptive_thresh
-        )
+    # Пересчёт контуров
+    st.session_state.primary_contours = processor.process_image(
+        scaling_factor, tolerance, binary_thresh, adaptive_thresh
+    )
 
-        # Инициализируем отфильтрованные контуры
-        st.session_state.secondary_contours = st.session_state.primary_contours.copy()
-        st.success("Фильтры применены!")
-
-    # Проверяем, есть ли обработанное изображение для отображения
-    if st.session_state.filtered_image is not None:
-        st.image(st.session_state.filtered_image, caption="Фильтрованное изображение", use_container_width=True)
-    else:
-        st.warning("Фильтрованное изображение не готово. Примените фильтры и нажмите кнопку 'Применить'.")
-
-    # Фильтры площади и периметра
-    if st.session_state.primary_contours:
-        st.session_state.secondary_contours = processor.filter_contours(
-            st.session_state.primary_contours, area_thresh, perimeter_thresh, st.session_state.removed_contour_ids
-        )
+    # Применение фильтров площади и периметра с учётом удалённых контуров
+    st.session_state.secondary_contours = processor.filter_contours(
+        st.session_state.primary_contours, area_thresh, perimeter_thresh, st.session_state.removed_contour_ids
+    )
 
     # Выбор текущего контура
-    if st.session_state.secondary_contours:
-        selected_contour_id = st.sidebar.selectbox(
-            "Выберите контур:",
-            options=list(st.session_state.secondary_contours.keys()),
-            format_func=lambda id_: f"Контур {id_ + 1}"
-        )
-        st.session_state.current_contour_id = selected_contour_id
+    selected_contour_id = st.sidebar.selectbox(
+        "Выберите контур:",
+        options=list(st.session_state.secondary_contours.keys()),
+        format_func=lambda id_: f"Контур {id_ + 1}"  # Для наглядности
+    )
+    st.session_state.current_contour_id = selected_contour_id
 
     # Удаление текущего контура
-    if st.sidebar.button("Удалить выбранный контур") and st.session_state.secondary_contours:
+    if st.sidebar.button("Удалить выбранный контур"):
         if st.session_state.current_contour_id in st.session_state.secondary_contours:
+            # Добавляем ID контура в список удалённых
             st.session_state.removed_contour_ids.add(st.session_state.current_contour_id)
-            st.session_state.filters_locked = True  # Блокируем изменение фильтров
             st.success(f"Контур {st.session_state.current_contour_id + 1} удалён.")
 
+    # Отображение изображений
+    st.image(st.session_state.filtered_image, caption="Фильтрованное изображение", use_container_width=True)
+
     # Отображение контуров
-    if st.session_state.secondary_contours:
-        result_image = processor.draw_contours(st.session_state.secondary_contours, highlight_id=st.session_state.current_contour_id)
-        st.image(result_image, caption="Контуры", use_container_width=True)
+    result_image = processor.draw_contours(st.session_state.secondary_contours, highlight_id=st.session_state.current_contour_id)
+    st.image(result_image, caption="Контуры", use_container_width=True)
 
     # Экспорт G-code
-    if st.button("Экспортировать в G-code (.MPF)") and st.session_state.secondary_contours:
+    if st.button("Экспортировать в G-code (.MPF)"):
         gcode_data = processor.export_to_mpf(st.session_state.secondary_contours)
         st.download_button(
             label="Скачать G-code",
