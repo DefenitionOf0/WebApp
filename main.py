@@ -88,7 +88,7 @@ def reset_state():
     st.session_state.removed_contour_ids = set()  # ID удалённых контуров
     st.session_state.filtered_image = None
     st.session_state.current_contour_id = None  # ID текущего выделенного контура
-    st.session_state.selected_contour_is = None
+    st.session_state.selected_contour_is = 0
 
 
 # Загрузка изображения
