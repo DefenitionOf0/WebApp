@@ -88,6 +88,7 @@ def reset_state():
     st.session_state.removed_contour_ids = set()  # ID удалённых контуров
     st.session_state.filtered_image = None
     st.session_state.current_contour_id = None  # ID текущего выделенного контура
+    st.session_state.selected_contour_is = None
 
 
 # Загрузка изображения
@@ -130,12 +131,12 @@ if uploaded_file:
     )
 
     # Выбор текущего контура
-    selected_contour_id = st.sidebar.selectbox(
+    st.session_state.selected_contour_id = st.sidebar.selectbox(
         "Выберите контур:",
         options=list(st.session_state.secondary_contours.keys()),
         format_func=lambda id_: f"Контур {id_ + 1}"  # Для наглядности
     )
-    st.session_state.current_contour_id = selected_contour_id
+    st.session_state.current_contour_id = st.session_state.selected_contour_id
 
     # Удаление текущего контура
     if st.sidebar.button("Удалить выбранный контур"):
