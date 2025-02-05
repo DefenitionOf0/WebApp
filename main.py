@@ -1,3 +1,5 @@
+from operator import index
+
 import streamlit as st
 import cv2
 import numpy as np
@@ -38,8 +40,9 @@ class ImageProcessor:
         self.binary_image = binary
         contours, _ = cv2.findContours(binary, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
         # Создаём словарь контуров с уникальными ID
-        contour_dict = {i: (cv2.approxPolyDP(contour, epsilon=tolerance, closed=True) * scaling_factor).astype(np.int32)
+        contour_dict = {i: (cv2.approxPolyDP(contour, epsilon=tolerance, closed=True) * scaling_factor).astype(np.float32)
                         for i, contour in enumerate(contours) if len(contour) >= 3}
+        print(contour_dict)
         return contour_dict
 
     def filter_contours(self, contours, area_thresh, perimeter_thresh, removed_ids):
@@ -52,33 +55,82 @@ class ImageProcessor:
 
     def draw_contours(self, contours, highlight_id=None):
         """Рисует контуры на пустом изображении."""
+        if len(highlight_id) is 0:
+            highlight_id = [0]
+
         result_image = np.zeros((self.image.shape[0], self.image.shape[1], 3), dtype=np.uint8)
+        #print("yep {}".format(highlight_id))
+
         for id_, contour in contours.items():
-            color = (0, 255, 0) if id_ == highlight_id else (255, 0, 255)
-            cv2.polylines(result_image, [contour.astype(np.int32)], isClosed=True, color=color, thickness=2)
+            #print(id_, contour)
+            color = (255, 0, 255)
+            cv2.polylines(result_image, [contour.astype(np.int32)], isClosed=True, color=color, thickness=1)
+            for itr in highlight_id:
+                if np.array_equal(contour, contours[itr]):
+                    color = (0, 255, 0)
+                    cv2.polylines(result_image, [contour.astype(np.int32)], isClosed=True, color=color, thickness=1)
+                    #print("if {}{}".format(itr, id_))
+
         return result_image
 
     def export_to_mpf(self, contours):
+        """Центрирование контура в 0"""
+        # Смещение в центр
+        height, width = self.binary_image.shape
+        center_x, center_y = width // 2, height // 2
+
+        transformed_contours = []
+        for contour in contours.values():
+            # Перемещаем контур в центр
+            contour = np.vstack([contour, contour[0:1]])  # Используем contour[0:1] для сохранения формы (1, 1, 2)
+            centered_contour = contour - [center_x * scaling_factor, center_y * scaling_factor]
+
+            # Инвертируем по осям
+            inverted_contour = centered_contour * [1, -1]  # Инверсия по обеим осям
+            transformed_contours.append(inverted_contour)
+
+
+
         """Экспортирует контуры в формате G-code."""
         gcode = []
-        gcode.append("BEGIN PGM G-CODE EXPORT\n")
-        for contour in contours.values():
-            gcode.append("G0 Z10.0\n")  # Подъем инструмента
+        gcode.append(";BEGIN PGM G-CODE EXPORT\n;GENERATED IN CONTOUR TOOL\n;CREATED BY IVAN S. OMP-8\n")
+        gcode.append("WORKPIECE(,\"\",,\"CYLINDER\",0,0,-16,-80,80)\n")
+        gcode.append("G54 G17\n")
+        gcode.append("T=\"CENTERDRILL\"\n")
+        gcode.append("M6\n")
+        gcode.append("S10000 M3 M8\n\n")
+        #gcode.append("G0 Z3\n")  # Подъем инструмента
+        for contour in transformed_contours:
             start_point = contour[0][0]
             gcode.append(f"G0 X{start_point[0]} Y{start_point[1]}\n")  # Переход к стартовой точке
-            gcode.append("G1 Z-1.0\n")  # Опускание инструмента
+            try:
+                print(gcode[8])
+            except:
+                gcode.append("G0 Z1\n")
+
+            gcode.append("G1 F10 Z-0.1\n")  # Опускание инструмента
+            gcode.append("G1 F50\n")
             for point in contour:
                 x, y = point[0]
-                gcode.append(f"G1 X{x} Y{y}\n")
-            gcode.append("G0 Z10.0\n")  # Подъем инструмента после контура
-        gcode.append("END PGM\n")
-        return "\n".join(gcode)
+                gcode.append(f"X{x} Y{y}\n")
+            gcode.append("G0 Z1\n")  # Подъем инструмента после контура
+
+        gcode.append("G75 Z1\nG75 X1 Y1\nM5 M9 M30\nEND PGM\n")
+        return "".join(gcode)
 
 
 # Настройка Streamlit
 st.set_page_config(page_title="Интерактивная обработка изображений", layout="wide")
 st.title("Интерактивная обработка изображений")
 
+
+def on_clk():
+    # Добавляем ID контура в список удалённых
+    st.session_state.filters_locked = True  # Блокируем изменение фильтров
+    for current in st.session_state.current_contour_id:
+        st.session_state.removed_contour_ids.add(current)
+    for selected in st.session_state.selected_contour_id:
+        del st.session_state.secondary_contours[selected]
 
 # Функция для сброса состояния
 def reset_state():
@@ -87,8 +139,10 @@ def reset_state():
     st.session_state.secondary_contours = None  # Отфильтрованные контуры (с учётом удалений)
     st.session_state.removed_contour_ids = set()  # ID удалённых контуров
     st.session_state.filtered_image = None
+    st.session_state.filters_locked = False  # Разрешает применение фильтров
     st.session_state.current_contour_id = None  # ID текущего выделенного контура
-    st.session_state.selected_contour_is = 0
+    st.session_state.selected_contour_id = None
+
 
 
 # Загрузка изображения
@@ -106,15 +160,15 @@ if uploaded_file:
     processor = ImageProcessor(image)
 
     # Боковая панель с фильтрами
-    blur = st.sidebar.slider("Размытие", 0, 10, 0)
-    contrast = st.sidebar.slider("Контрастность", 1.0, 3.0, 1.0)
-    median_filter = st.sidebar.slider("Медианный фильтр", 0, 10, 0)
-    scaling_factor = st.sidebar.slider("Масштаб контуров", 0.1, 1.0, 1.0)
+    blur = st.sidebar.slider("Размытие", 0, 10, 0, disabled=st.session_state.filters_locked)
+    contrast = st.sidebar.slider("Контрастность", 1.0, 3.0, 1.0, disabled=st.session_state.filters_locked)
+    median_filter = st.sidebar.slider("Медианный фильтр", 0, 10, 0, disabled=st.session_state.filters_locked)
+    scaling_factor = st.sidebar.slider("Масштаб контуров", 0.01, 1.0, 1.0)
     tolerance = st.sidebar.slider("Упрощение контуров", 0.1, 10.0, 1.0)
     binary_thresh = st.sidebar.slider("Порог бинаризации", 0, 255, 127)
     adaptive_thresh = st.sidebar.checkbox("Адаптивная бинаризация")
-    area_thresh = st.sidebar.slider("Минимальная площадь", 1, 1000, 10)
-    perimeter_thresh = st.sidebar.slider("Минимальная длина периметра", 1, 500, 10)
+    area_thresh = st.sidebar.slider("Минимальная площадь", 0, 1000, 0)
+    perimeter_thresh = st.sidebar.slider("Минимальная длина периметра", 0, 500, 0)
 
     # Применение фильтров к изображению
     st.session_state.filtered_image = processor.apply_filters(blur, contrast, median_filter)
@@ -129,28 +183,40 @@ if uploaded_file:
     st.session_state.secondary_contours = processor.filter_contours(
         st.session_state.primary_contours, area_thresh, perimeter_thresh, st.session_state.removed_contour_ids
     )
-
+    # Удаление текущего контура
+    if st.sidebar.button("Удалить выбранный контур", key=123, use_container_width=True):
+        on_clk()
+    #print(st.session_state.selected_contour_id)
+    #print(st.session_state.current_contour_id)
     # Выбор текущего контура
-    st.session_state.selected_contour_id = st.sidebar.selectbox(
+    #st.session_state.selected_contour_id = next(iter(st.session_state.secondary_contours))
+    st.session_state.selected_contour_id = st.sidebar.multiselect(
         "Выберите контур:",
         options=list(st.session_state.secondary_contours.keys()),
-        format_func=lambda id_: f"Контур {id_ + 1}"  # Для наглядности
+        default=next(iter(list(st.session_state.secondary_contours.keys()))),
+        key = 222,
+        on_change = None
     )
     st.session_state.current_contour_id = st.session_state.selected_contour_id
-
-    # Удаление текущего контура
-    if st.sidebar.button("Удалить выбранный контур"):
-        if st.session_state.current_contour_id in st.session_state.secondary_contours:
-            # Добавляем ID контура в список удалённых
-            st.session_state.removed_contour_ids.add(st.session_state.current_contour_id)
-            st.success(f"Контур {st.session_state.current_contour_id + 1} удалён.")
 
     # Отображение изображений
     st.image(st.session_state.filtered_image, caption="Фильтрованное изображение", use_container_width=True)
 
     # Отображение контуров
-    result_image = processor.draw_contours(st.session_state.secondary_contours, highlight_id=st.session_state.current_contour_id)
+    result_image = processor.draw_contours(st.session_state.secondary_contours,
+                                           highlight_id=st.session_state.current_contour_id)
+
     st.image(result_image, caption="Контуры", use_container_width=True)
+
+
+
+
+
+
+        #st.session_state.current_contour_id = next(iter(st.session_state.secondary_contours))
+        #st.session_state.selected_contour_id = next(iter(st.session_state.secondary_contours))
+
+
 
     # Экспорт G-code
     if st.button("Экспортировать в G-code (.MPF)"):
@@ -161,3 +227,4 @@ if uploaded_file:
             file_name="contours.mpf",
             mime="text/plain"
         )
+
