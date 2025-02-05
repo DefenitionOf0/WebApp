@@ -104,7 +104,7 @@ class ImageProcessor:
             start_point = contour[0][0]
             gcode.append(f"G0 X{start_point[0]} Y{start_point[1]}\n")  # Переход к стартовой точке
             try:
-                (gcode[8])
+                print(gcode[8])
             except:
                 gcode.append("G0 Z1\n")
 
