@@ -42,7 +42,7 @@ class ImageProcessor:
         # Создаём словарь контуров с уникальными ID
         contour_dict = {i: (cv2.approxPolyDP(contour, epsilon=tolerance, closed=True) * scaling_factor).astype(np.float32)
                         for i, contour in enumerate(contours) if len(contour) >= 3}
-        print(contour_dict)
+        #print(contour_dict)
         return contour_dict
 
     def filter_contours(self, contours, area_thresh, perimeter_thresh, removed_ids):
@@ -59,17 +59,17 @@ class ImageProcessor:
             highlight_id = [0]
 
         result_image = np.zeros((self.image.shape[0], self.image.shape[1], 3), dtype=np.uint8)
-        #print("yep {}".format(highlight_id))
+        #("yep {}".format(highlight_id))
 
         for id_, contour in contours.items():
-            #print(id_, contour)
+            #(id_, contour)
             color = (255, 0, 255)
             cv2.polylines(result_image, [contour.astype(np.int32)], isClosed=True, color=color, thickness=1)
             for itr in highlight_id:
                 if np.array_equal(contour, contours[itr]):
                     color = (0, 255, 0)
                     cv2.polylines(result_image, [contour.astype(np.int32)], isClosed=True, color=color, thickness=1)
-                    #print("if {}{}".format(itr, id_))
+                    #("if {}{}".format(itr, id_))
 
         return result_image
 
@@ -104,7 +104,7 @@ class ImageProcessor:
             start_point = contour[0][0]
             gcode.append(f"G0 X{start_point[0]} Y{start_point[1]}\n")  # Переход к стартовой точке
             try:
-                print(gcode[8])
+                (gcode[8])
             except:
                 gcode.append("G0 Z1\n")
 
