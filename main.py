@@ -209,7 +209,7 @@ if uploaded_file:
 
     st.image(result_image, caption="Контуры", use_container_width=True)
 
-st.success(self.size)
+st.success("{}"format(self.size))
 
 
 
