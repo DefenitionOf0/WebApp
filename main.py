@@ -14,6 +14,7 @@ class ImageProcessor:
         self.filtered_image = None
         self.binary_image = None
         self.contours = None
+        self.size = None
 
     def apply_filters(self, blur, contrast, median_filter):
         """Применяет фильтры размытия, контрастности и медианного фильтра к изображению."""
@@ -88,7 +89,7 @@ class ImageProcessor:
             # Инвертируем по осям
             inverted_contour = centered_contour * [1, -1]  # Инверсия по обеим осям
             transformed_contours.append(inverted_contour)
-
+self.size = max(max(p[1:]) for p in transformed_contours)
 
 
         """Экспортирует контуры в формате G-code."""
@@ -208,7 +209,7 @@ if uploaded_file:
 
     st.image(result_image, caption="Контуры", use_container_width=True)
 
-
+st.success(self.size)
 
 
 
